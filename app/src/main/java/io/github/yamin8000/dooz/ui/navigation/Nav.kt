@@ -25,5 +25,6 @@ object Nav {
         const val game = "game"
         const val settings = "settings"
         const val about = "about"
+        const val bluetooth = "bluetooth"
     }
 }

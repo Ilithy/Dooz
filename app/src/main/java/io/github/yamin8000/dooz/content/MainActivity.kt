@@ -35,6 +35,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import io.github.yamin8000.dooz.content.game.GameContent
+import io.github.yamin8000.dooz.content.online.BluetoothGameContent
 import io.github.yamin8000.dooz.content.settings.ThemeSetting
 import io.github.yamin8000.dooz.content.settings.content.SettingsContent
 import io.github.yamin8000.dooz.ui.navigation.Nav
@@ -77,12 +78,13 @@ class MainActivity : ComponentActivity() {
                 composable(Nav.Routes.game) {
                     GameContent(
                         onNavigateToSettings = { navController.navigate(Nav.Routes.settings) },
-                        onNavigateToAbout = { navController.navigate(Nav.Routes.about) }
+                        onNavigateToAbout = { navController.navigate(Nav.Routes.bluetooth) }
                     )
                 }
 
                 composable(Nav.Routes.settings) { SettingsContent { newTheme -> theme = newTheme } }
                 composable(Nav.Routes.about) { AboutContent() }
+                composable(Nav.Routes.bluetooth) { BluetoothGameContent() }
             }
         }
     }
