@@ -21,9 +21,11 @@
 
 package io.github.yamin8000.dooz.content.online
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
+import android.bluetooth.BluetoothSocket
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -34,11 +36,19 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
+import io.github.yamin8000.dooz.util.Utility.log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 class BluetoothGameState(
     private val context: Context,
-    val isBluetoothSupported: MutableState<Boolean>,
+    val scope: CoroutineScope,
+    private val isBluetoothSupported: MutableState<Boolean>,
     val isBluetoothPermissionsGranted: MutableState<Boolean>,
     val isBluetoothEnabled: MutableState<Boolean>,
     val isEnablingBluetooth: MutableState<Boolean>,
@@ -48,7 +58,16 @@ class BluetoothGameState(
     private var manager: BluetoothManager? = null
     private var adapter: BluetoothAdapter? = null
 
-    private val bluetoothIntentFilter = IntentFilter(BluetoothDevice.ACTION_FOUND)
+    private var serverThread: BluetoothServerThread? = null
+    private var clientThread: BluetoothClientThread? = null
+    private var connectionThread: BluetoothConnectionThread? = null
+
+    private val bluetoothIntentFilter = IntentFilter().apply {
+        addAction(BluetoothDevice.ACTION_FOUND)
+        addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED)
+        addAction(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE)
+        addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED)
+    }
 
     val isReadyToScan: Boolean
         get() {
@@ -58,43 +77,84 @@ class BluetoothGameState(
                     !isScanning.value
         }
 
+    val isReadyToStartServer: Boolean
+        get() {
+            return isBluetoothEnabled.value &&
+                    isBluetoothSupported.value &&
+                    isBluetoothPermissionsGranted.value
+        }
+
+    private val receiver = object : BroadcastReceiver() {
+
+        @SuppressLint("MissingPermission")
+        override fun onReceive(context: Context?, intent: Intent?) {
+            "on Receive => ${intent?.action}".log()
+            when (intent?.action) {
+                BluetoothDevice.ACTION_FOUND -> {
+                    val device =
+                        intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
+                    if (device != null)
+                        devices.value = buildSet { devices.value + device }
+                    (device?.name ?: "null device").log()
+                }
+                BluetoothAdapter.ACTION_DISCOVERY_STARTED -> {
+                    //"discovery started".log()
+                }
+                BluetoothAdapter.ACTION_DISCOVERY_FINISHED -> {
+                    isScanning.value = false
+                }
+            }
+        }
+    }
 
     init {
         initBluetooth()
         isBluetoothEnabled.value = adapter?.isEnabled == true
-    }
-
-    fun startScan() {
         context.registerReceiver(receiver, bluetoothIntentFilter)
-    }
-
-    fun stopScan() {
-        context.unregisterReceiver(receiver)
     }
 
     private fun initBluetooth() {
         manager = ContextCompat.getSystemService(context, BluetoothManager::class.java)
         adapter = manager?.adapter
         isBluetoothSupported.value = adapter != null
+        "bluetooth init".log()
     }
 
-    private val receiver = object : BroadcastReceiver() {
+    fun startScan() {
+        adapter?.startDiscovery()
+        devices.value + adapter?.bondedDevices
+        "start scan".log()
+    }
 
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == BluetoothDevice.ACTION_FOUND) {
-                val device =
-                    intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                if (device != null)
-                    devices.value = buildSet { devices.value + device }
+    fun stopScan() {
+        context.unregisterReceiver(receiver)
+        adapter?.cancelDiscovery()
+    }
+
+    suspend fun serverAccept(): BluetoothSocket? {
+        val adapterCopy = adapter
+        if (adapterCopy != null) {
+            return suspendCancellableCoroutine { continuation ->
+                serverThread = BluetoothServerThread(
+                    adapterCopy,
+                    onAccept = { continuation.resume(it) },
+                    onFailed = { continuation.resumeWithException(it) }
+                )
+                serverThread?.start()
             }
         }
+        return null
     }
 
+    suspend fun cancelServer() {
+        serverThread?.cancel()
+    }
 }
 
 @Composable
 fun rememberBluetoothGameState(
     context: Context = LocalContext.current,
+    scope: CoroutineScope = LocalLifecycleOwner.current.lifecycleScope,
     isBluetoothSupported: MutableState<Boolean> = rememberSaveable { mutableStateOf(false) },
     isBluetoothPermissionsGranted: MutableState<Boolean> = rememberSaveable { mutableStateOf(false) },
     isBluetoothEnabled: MutableState<Boolean> = rememberSaveable { mutableStateOf(false) },
@@ -104,6 +164,7 @@ fun rememberBluetoothGameState(
 ) = remember(isBluetoothSupported) {
     BluetoothGameState(
         context,
+        scope,
         isBluetoothSupported,
         isBluetoothPermissionsGranted,
         isBluetoothEnabled,

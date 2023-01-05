@@ -30,6 +30,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.launch
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,6 +45,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import io.github.yamin8000.dooz.ui.composables.GrantMultiplePermissions
 import io.github.yamin8000.dooz.ui.composables.hasPermissions
+import kotlinx.coroutines.launch
 
 @SuppressLint("MissingPermission")
 @OptIn(ExperimentalFoundationApi::class)
@@ -89,8 +91,6 @@ fun BluetoothGameContent() {
                 Row(
                     modifier = Modifier.padding(8.dp)
                 ) {
-                    Text(text = "support: ${state.isBluetoothSupported.value}")
-                    Text(text = "state: ${state.isBluetoothEnabled.value}")
                     Button(
                         enabled = !state.isBluetoothEnabled.value,
                         content = { Text("Enable") },
@@ -99,12 +99,29 @@ fun BluetoothGameContent() {
                     Button(
                         enabled = state.isReadyToScan,
                         content = { Text("Scan") },
-                        onClick = { state.isScanning.value = true }
+                        onClick = {
+                            state.isScanning.value = true
+                            state.startScan()
+                        }
+                    )
+                    Button(
+                        enabled = state.isReadyToStartServer,
+                        content = { Text("Start Server") },
+                        onClick = {
+                            state.scope.launch {
+                                state.serverAccept()
+                            }
+                        }
                     )
                 }
             }
             items(state.devices.value.toList()) {
-                Text("${it.name} <--> ${it.address}")
+                Text(
+                    text = "${it.name} <--> ${it.address}",
+                    modifier = Modifier.clickable {
+
+                    }
+                )
             }
         }
     }

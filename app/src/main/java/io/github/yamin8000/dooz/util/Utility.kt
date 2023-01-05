@@ -22,9 +22,15 @@ package io.github.yamin8000.dooz.util
 
 import android.content.Context
 import android.os.Build
+import android.util.Log
+import io.github.yamin8000.dooz.util.Constants.LOG_TAG
 import java.util.*
 
 object Utility {
+
+    fun String.log() {
+        Log.d(LOG_TAG, this)
+    }
 
     @Suppress("DEPRECATION")
     fun getCurrentLocale(
