@@ -21,7 +21,6 @@
 
 package io.github.yamin8000.dooz.content.online
 
-import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothDevice
 import android.bluetooth.BluetoothManager
@@ -30,6 +29,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.PackageManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -86,16 +86,17 @@ class BluetoothGameState(
 
     private val receiver = object : BroadcastReceiver() {
 
-        @SuppressLint("MissingPermission")
         override fun onReceive(context: Context?, intent: Intent?) {
             "on Receive => ${intent?.action}".log()
             when (intent?.action) {
                 BluetoothDevice.ACTION_FOUND -> {
                     val device =
                         intent.getParcelableExtra<BluetoothDevice>(BluetoothDevice.EXTRA_DEVICE)
-                    if (device != null)
+                    if (device != null) {
                         devices.value = buildSet { devices.value + device }
-                    (device?.name ?: "null device").log()
+                        device.address.log()
+                        devices.value.joinToString().log()
+                    } else "device is somehow null!".log()
                 }
                 BluetoothAdapter.ACTION_DISCOVERY_STARTED -> {
                     //"discovery started".log()
@@ -121,7 +122,13 @@ class BluetoothGameState(
     }
 
     fun startScan() {
-        adapter?.startDiscovery()
+        if (
+            ContextCompat.checkSelfPermission(
+                context, android.Manifest.permission.BLUETOOTH_ADMIN
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+            adapter?.startDiscovery()
+        else "permission denied for bluetooth scan".log()
         devices.value + adapter?.bondedDevices
         "start scan".log()
     }

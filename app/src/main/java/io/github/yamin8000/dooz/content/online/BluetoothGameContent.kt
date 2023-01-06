@@ -23,13 +23,13 @@ package io.github.yamin8000.dooz.content.online
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.launch
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -48,7 +48,6 @@ import io.github.yamin8000.dooz.ui.composables.hasPermissions
 import kotlinx.coroutines.launch
 
 @SuppressLint("MissingPermission")
-@OptIn(ExperimentalFoundationApi::class)
 @Preview
 @Composable
 fun BluetoothGameContent() {
@@ -58,6 +57,8 @@ fun BluetoothGameContent() {
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         val permissions = listOf(
+            android.Manifest.permission.BLUETOOTH,
+            android.Manifest.permission.BLUETOOTH_ADMIN,
             android.Manifest.permission.BLUETOOTH_CONNECT,
             android.Manifest.permission.BLUETOOTH_ADVERTISE,
             android.Manifest.permission.BLUETOOTH_SCAN
@@ -82,47 +83,59 @@ fun BluetoothGameContent() {
     }
 
     Surface(
-        modifier = Modifier.fillMaxSize()
+        modifier = Modifier
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .fillMaxSize()
     ) {
-        LazyColumn(
-            modifier = Modifier.windowInsetsPadding(WindowInsets.Companion.safeDrawing)
-        ) {
-            stickyHeader {
-                Row(
-                    modifier = Modifier.padding(8.dp)
-                ) {
-                    Button(
-                        enabled = !state.isBluetoothEnabled.value,
-                        content = { Text("Enable") },
-                        onClick = { state.isEnablingBluetooth.value = true }
-                    )
-                    Button(
-                        enabled = state.isReadyToScan,
-                        content = { Text("Scan") },
-                        onClick = {
-                            state.isScanning.value = true
-                            state.startScan()
+        Column {
+            Row(
+                modifier = Modifier.padding(8.dp)
+            ) {
+                Button(
+                    enabled = !state.isBluetoothEnabled.value,
+                    content = { Text("Enable") },
+                    onClick = { state.isEnablingBluetooth.value = true }
+                )
+                Button(
+                    enabled = state.isReadyToScan,
+                    content = { Text("Scan") },
+                    onClick = {
+                        state.isScanning.value = true
+                        state.startScan()
+                    }
+                )
+                Button(
+                    enabled = state.isReadyToStartServer,
+                    content = { Text("Start Server") },
+                    onClick = {
+                        state.scope.launch {
+                            state.serverAccept()
                         }
-                    )
-                    Button(
-                        enabled = state.isReadyToStartServer,
-                        content = { Text("Start Server") },
-                        onClick = {
-                            state.scope.launch {
-                                state.serverAccept()
-                            }
-                        }
-                    )
-                }
-            }
-            items(state.devices.value.toList()) {
-                Text(
-                    text = "${it.name} <--> ${it.address}",
-                    modifier = Modifier.clickable {
-
                     }
                 )
             }
+            DevicesList(state.devices.value)
+        }
+    }
+}
+
+@Composable
+private fun DevicesList(
+    devices: Set<BluetoothDevice>
+) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize()
+    ) {
+        item {
+            Text("Test")
+        }
+        items(devices.toList()) {
+            Text(
+                text = it.address,
+                modifier = Modifier.clickable {
+
+                }
+            )
         }
     }
 }
